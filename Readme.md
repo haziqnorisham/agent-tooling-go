@@ -18,10 +18,18 @@ that every tool-using AI service is built from.
 ## Run it
 
 ```bash
-go mod tidy          # downloads github.com/sashabaranov/go-openai
-export OPENAI_API_KEY=sk-...
+go mod tidy                        # downloads github.com/sashabaranov/go-openai
+export OPENAI_API_KEY=sk-...       # optional — omit for local runtimes
 go run main.go
 ```
+
+The service reads these environment variables on startup:
+
+| Variable | Default | Description |
+|---|---|---|
+| `OPENAI_BASE_URL` | `https://api.openai.com/v1` | Base URL of any OpenAI-compatible API |
+| `OPENAI_API_KEY` | — | API key (empty is fine for local servers) |
+| `OPENAI_MODEL` | `gpt-4o-mini` | Model name to use for chat completions |
 
 ## Try it
 
@@ -33,6 +41,37 @@ curl -X POST localhost:8080/chat \
 
 Expected: the model calls `get_weather`, gets back a fixed "sunny, 24°C"
 result, and replies in plain English mentioning that.
+
+## Pointing at another OpenAI-compatible provider
+
+The service works against any server that implements the OpenAI chat
+completions API — Ollama, LM Studio, vLLM, OpenRouter, Azure (via an
+OpenAI-compatible gateway), etc.
+
+### Ollama (local)
+
+```bash
+# First pull a model, e.g.:
+#   ollama pull llama3.2
+
+export OPENAI_BASE_URL=http://localhost:11434/v1
+export OPENAI_API_KEY=ollama       # Ollama accepts any non-empty value
+export OPENAI_MODEL=llama3.2
+go run main.go
+```
+
+### OpenRouter
+
+```bash
+export OPENAI_BASE_URL=https://openrouter.ai/api/v1
+export OPENAI_API_KEY=sk-or-...    # from https://openrouter.ai/keys
+export OPENAI_MODEL=openai/gpt-4o-mini
+go run main.go
+```
+
+**Note:** tool-calling support depends on the target provider and model.
+Some servers ignore the `tools` field entirely — in that case the service
+still works for basic chat, but the tool loop is skipped.
 
 ## Extending it
 
