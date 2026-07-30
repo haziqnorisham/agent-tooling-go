@@ -1,0 +1,33 @@
+# ----- Compiled binaries -----
+# Output of `go build` / `go build main.go`
+simple-ai-service
+main
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# ----- Test & coverage artifacts -----
+*.test
+*.out
+
+# ----- Go workspace files -----
+go.work
+go.work.sum
+
+# ----- Environment & secrets -----
+# This service reads OPENAI_API_KEY — never commit it
+.env
+.env.*
+!.env.example
+
+# ----- Editor / IDE -----
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# ----- OS junk -----
+.DS_Store
+Thumbs.db
