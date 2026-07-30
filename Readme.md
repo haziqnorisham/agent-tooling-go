@@ -15,6 +15,10 @@ and returns the model's final natural-language answer as `{"reply": "..."}`.
 No database, no framework, no extra tools — just the request/response loop
 that every tool-using AI service is built from.
 
+Logs go to **stdout** with step tags (`[config]`, `[http]`, `[chat]`,
+`[llm]`, `[tool]`, `[flow]`) so you can watch config load, each LLM round,
+tool dispatch, and the final reply without a debugger.
+
 ## Run it
 
 ```bash
