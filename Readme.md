@@ -100,3 +100,86 @@ still works for basic chat, but the tool loop is skipped.
 - Swap `sashabaranov/go-openai` for the official `openai/openai-go` SDK if
   you prefer — the tool-calling shape (`tools`, `tool_calls`, `tool` role
   message) is the same across SDKs since it mirrors OpenAI's API directly.
+
+## Production hardening
+
+This boilerplate is minimal by design. The following are recommendations
+in order of priority for taking it to production.
+
+### Must-haves
+
+**Tool-loop safety.** Three things people skip and regret:
+
+1. **Max iteration count** — models can loop forever. Cap the tool-calling
+   loop (e.g. 5 rounds), then force a final answer or error out.
+
+2. **Per-request timeout** — thread a `context.WithTimeout` through every
+   LLM and tool call. A single runaway request blocks the server.
+
+3. **Duplicate call guard** — the model sometimes calls the same tool with
+   the same arguments multiple times. Hash the call (name + args) and skip
+   or bail if the hash is seen twice in one request.
+
+**Chat history persistence.** You don't need a heavy DB for this. Options
+in order of simplicity:
+
+- **SQLite** (via `mattn/go-sqlite3` or `modernc.org/sqlite` for pure-Go,
+  no cgo) — genuinely enough for most single-instance deployments.
+- **Postgres** only once you need multiple app instances sharing state.
+
+Store: `conversation_id`, `role`, `content`, `tool_calls`/`tool_results`
+as JSON, `created_at`. Load history by `conversation_id`, cap it (last N
+messages or a token budget) before sending to the model — unbounded
+history will blow your context window and your bill.
+
+**Streaming endpoint.** Add a separate `/chat/stream` using SSE
+(`text/event-stream`). The OpenAI-compatible streaming API sends delta
+chunks; forward each delta to the client as it arrives. Tool calls
+complicate this — the model streams tool-call arguments as fragments too,
+so you buffer until the call is complete, execute it, then resume
+streaming.
+
+**Tool argument validation.** Right now `json.Unmarshal` silently accepts
+garbage. Validate against the JSON schema (or at minimum check required
+fields aren't empty) before executing a tool, and return a structured
+error back to the model rather than crashing or passing bad data through.
+
+**Retry/backoff on LLM calls.** Rate limits and transient 5xxs are
+routine. Wrap the OpenAI call with a small retry (2-3 attempts,
+exponential backoff) for retryable status codes only.
+
+**Graceful shutdown.** `http.Server` with `Shutdown(ctx)` on `SIGTERM` so
+in-flight requests (especially streaming ones) finish cleanly instead of
+getting cut.
+
+### Should-haves
+
+**Tool registry pattern.** Instead of a growing `switch` in `callTool`,
+use a `map[string]Tool` where each tool is `{Schema, Handler}`. Makes
+adding tools additive, not an edit to a central function. Worth doing
+before you add more than ~3 tools.
+
+**Structured logging with request IDs.** You already have stdout logging;
+the next step is a request/conversation ID threaded through every log
+line so you can trace one conversation's full tool-call chain in
+production.
+
+**Basic auth on the endpoint.** Even a static API key header check. It's
+your service, not OpenAI's — nothing stops randos from hitting it and
+spending your OpenAI budget if it's public.
+
+**Token/cost guardrails.** Cap `max_tokens` per response, and consider a
+per-conversation or per-day spend ceiling if this is user-facing.
+
+### Probably skip for now
+
+These add complexity disproportionate to value at this stage:
+
+- **Vector DB / RAG** — only if you actually need retrieval; don't add
+  speculatively.
+- **Multi-agent orchestration frameworks** — a single tool loop is fine
+  until you have a concrete reason for more.
+- **Kubernetes / complex deployment** — a Dockerfile + single container
+  is enough until you have real scale needs.
+- **Websockets over SSE** for streaming — SSE is simpler and sufficient
+  unless you need bidirectional push.
