@@ -18,12 +18,15 @@ that every tool-using AI service is built from.
 ## Run it
 
 ```bash
-go mod tidy                        # downloads github.com/sashabaranov/go-openai
-export OPENAI_API_KEY=sk-...       # optional — omit for local runtimes
+go mod tidy                        # downloads dependencies
+cp .env.example .env               # optional — edit with your values
+# or: export OPENAI_API_KEY=sk-...
 go run main.go
 ```
 
-The service reads these environment variables on startup:
+On startup the service loads a local `.env` file if present (via `godotenv`),
+then reads these variables. Values already set in the process environment
+always win over `.env`.
 
 | Variable | Default | Description |
 |---|---|---|

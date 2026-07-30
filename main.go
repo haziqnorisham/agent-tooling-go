@@ -30,6 +30,7 @@ import (
 	"net/url"
 	"os"
 
+	"github.com/joho/godotenv"
 	openai "github.com/sashabaranov/go-openai"
 )
 
@@ -196,6 +197,10 @@ func writeJSON(w http.ResponseWriter, v any) {
 }
 
 func main() {
+	// Load .env if present; real environment variables always take precedence.
+	// Missing file is fine — config still comes from the process environment.
+	_ = godotenv.Load()
+
 	cfg, err := loadConfig()
 	if err != nil {
 		log.Fatal(err)
