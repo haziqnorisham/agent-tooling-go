@@ -12,12 +12,24 @@ the `get_weather` tool schema. If the model decides it needs the tool, the
 server runs the matching Go function, feeds the result back to the model,
 and returns the model's final natural-language answer as `{"reply": "..."}`.
 
-No database, no framework, no extra tools — just the request/response loop
-that every tool-using AI service is built from.
+No database, no framework — just the request/response loop that every
+tool-using AI service is built from.
 
 Logs go to **stdout** with step tags (`[config]`, `[http]`, `[chat]`,
 `[llm]`, `[tool]`, `[flow]`) so you can watch config load, each LLM round,
 tool dispatch, and the final reply without a debugger.
+
+## Layout
+
+```
+cmd/server/main.go          # process entrypoint (wire + start)
+internal/config/            # env / .env loading
+internal/logging/           # stdout log setup + helpers
+internal/tools/             # tool schemas + local implementations
+internal/llm/               # OpenAI-compatible client + tool-calling loop
+internal/handler/           # HTTP request/response for /chat
+internal/server/            # ServeMux + ListenAndServe
+```
 
 ## Run it
 
@@ -25,7 +37,7 @@ tool dispatch, and the final reply without a debugger.
 go mod tidy                        # downloads dependencies
 cp .env.example .env               # optional — edit with your values
 # or: export OPENAI_API_KEY=sk-...
-go run main.go
+go run ./cmd/server
 ```
 
 On startup the service loads a local `.env` file if present (via `godotenv`),
@@ -37,6 +49,7 @@ always win over `.env`.
 | `OPENAI_BASE_URL` | `https://api.openai.com/v1` | Base URL of any OpenAI-compatible API |
 | `OPENAI_API_KEY` | — | API key (empty is fine for local servers) |
 | `OPENAI_MODEL` | `gpt-4o-mini` | Model name to use for chat completions |
+| `HTTP_ADDR` | `:8080` | HTTP listen address |
 
 ## Try it
 
@@ -64,7 +77,7 @@ OpenAI-compatible gateway), etc.
 export OPENAI_BASE_URL=http://localhost:11434/v1
 export OPENAI_API_KEY=ollama       # Ollama accepts any non-empty value
 export OPENAI_MODEL=llama3.2
-go run main.go
+go run ./cmd/server
 ```
 
 ### OpenRouter
@@ -73,7 +86,7 @@ go run main.go
 export OPENAI_BASE_URL=https://openrouter.ai/api/v1
 export OPENAI_API_KEY=sk-or-...    # from https://openrouter.ai/keys
 export OPENAI_MODEL=openai/gpt-4o-mini
-go run main.go
+go run ./cmd/server
 ```
 
 **Note:** tool-calling support depends on the target provider and model.
@@ -82,7 +95,7 @@ still works for basic chat, but the tool loop is skipped.
 
 ## Extending it
 
-- Add more tools: define another `openai.Tool` + case in `callTool`.
+- Add more tools: define another schema + case in `internal/tools`.
 - Swap the fake `getWeather` for a real API call.
 - Swap `sashabaranov/go-openai` for the official `openai/openai-go` SDK if
   you prefer — the tool-calling shape (`tools`, `tool_calls`, `tool` role
